@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Luna</title>
+
+  <!-- PWA meta tags -->
+  <meta name="theme-color"                           content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable"          content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title"            content="Luna" />
+  <meta name="mobile-web-app-capable"                content="yes" />
+  <meta name="application-name"                      content="Luna" />
+  <meta name="description"                           content="Simple calendar tracking" />
+
+  <link rel="manifest"         href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-512.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body { background-color: #0f172a; }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.6);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="bg-slate-900">
+  <div id="root"></div>
+
+  <script type="module">
+    import { html, render, useState, useEffect }
+      from 'https://esm.sh/htm@3.1.1/preact/standalone';
+
+    // ── ICONS ──────────────────────────────────────────────────────────────────
+    // Each icon value is an array of SVG path "d" strings.
+    // The Icon component renders all paths inside one SVG.
+
+    function Icon({ d, size = 20, cls = '' }) {
+      const paths = Array.isArray(d) ? d : [d];
+      return html`
+        <svg
+          width=${size} height=${size} viewBox="0 0 24 24"
+          fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          class=${cls}
+        >${paths.map(p => html`<path d=${p} />`)}</svg>`;
+    }
+
+    const ICONS = {
+      bell:        ['M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9',
+                    'M10.3 21a1.94 1.94 0 0 0 3.4 0'],
+      bellOff:     ['M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5',
+                    'M17 17H3s3-2 3-9',
+                    'M10.3 21a1.94 1.94 0 0 0 3.4 0',
+                    'M2 2l20 20'],
+      calendar:    ['M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+                    'M16 2v4', 'M8 2v4', 'M3 10h18'],
+      plus:        ['M12 5v14', 'M5 12h14'],
+      x:           ['M18 6L6 18', 'M6 6l12 12'],
+      check:       ['M20 6L9 17l-5-5'],
+      chevronDown: ['M6 9l6 6 6-6'],
+      chevronUp:   ['M18 15l-6-6-6 6'],
+      pencil:      ['M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'],
+      trash:       ['M3 6h18',
+                    'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6',
+                    'M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2',
+                    'M10 11v6', 'M14 11v6'],
+    };
+
+    // ── DATE UTILS ─────────────────────────────────────────────────────────────
+
+    function getTodayISO() {
+      return new Date().toISOString().split('T')[0];
+    }
+
+    function isValidDate(dateString) {
+      if (!dateString || typeof dateString !== 'string') return false;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return false;
+      const date = new Date(dateString + 'T00:00:00');
+      return !isNaN(date.getTime());
+    }
+
+    function isValidCycle(cycle) {
+      if (!cycle || typeof cycle !== 'object') return false;
+      if (!isValidDate(cycle.date)) return false;
+      if (cycle.duration !== undefined && (typeof cycle.duration !== 'number' || cycle.duration <= 0)) return false;
+      if (cycle.notes !== undefined && typeof cycle.notes !== 'string') return false;
+      return true;
+    }
+
+    function formatDate(dateString) {
+      if (!isValidDate(dateString)) return 'Invalid date';
+      return new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric',
+      });
+    }
+
+    function getDaysBetween(date1, date2) {
+      const MS = 1000 * 60 * 60 * 24;
+      return Math.round(
+        (new Date(date2 + 'T00:00:00') - new Date(date1 + 'T00:00:00')) / MS
+      );
+    }
+
+    function getDaysUntil(dateString) {
+      const MS = 1000 * 60 * 60 * 24;
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      return Math.round((new Date(dateString + 'T00:00:00') - today) / MS);
+    }
+
+    // ── STORAGE ────────────────────────────────────────────────────────────────
+
+    const KEY_CYCLES     = 'cycle-data';
+    const KEY_NOTIF      = 'notifications-enabled';
+    const KEY_LAST_NOTIF = 'last-notified-date';
+
+    function saveCycles(cycles) {
+      try { localStorage.setItem(KEY_CYCLES, JSON.stringify(cycles)); } catch (e) {}
+    }
+    function loadCycles() {
+      try {
+        const raw = localStorage.getItem(KEY_CYCLES);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter(isValidCycle) : [];
+      } catch (e) { return []; }
+    }
+    function saveNotificationPreference(v) {
+      try { localStorage.setItem(KEY_NOTIF, String(v)); } catch (e) {}
+    }
+    function loadNotificationPreference() {
+      try { return localStorage.getItem(KEY_NOTIF) === 'true'; } catch (e) { return false; }
+    }
+    function saveLastNotifiedDate(d) {
+      try { localStorage.setItem(KEY_LAST_NOTIF, d); } catch (e) {}
+    }
+    function loadLastNotifiedDate() {
+      try { return localStorage.getItem(KEY_LAST_NOTIF) || null; } catch (e) { return null; }
+    }
+
+    // ── CALCULATIONS ───────────────────────────────────────────────────────────
+
+    const DEFAULT_CYCLE_DURATION = 5;
+    const DEFAULT_CYCLE_LENGTH   = 28;
+
+    function calculateAverageDuration(cycles) {
+      const withDur = cycles.filter(c => c.duration && c.duration > 0);
+      if (!withDur.length) return DEFAULT_CYCLE_DURATION;
+      return Math.round(withDur.reduce((s, c) => s + c.duration, 0) / withDur.length);
+    }
+
+    function getCycleIntervals(cycles) {
+      if (!cycles || cycles.length < 2) return [];
+      const sorted = [...cycles].sort((a, b) => a.date.localeCompare(b.date));
+      const intervals = [];
+      for (let i = 1; i < sorted.length; i++) {
+        const gap = getDaysBetween(sorted[i - 1].date, sorted[i].date);
+        if (gap > 0) intervals.push(gap);
+      }
+      return intervals;
+    }
+
+    function calculateAverageCycleLength(cycles) {
+      const intervals = getCycleIntervals(cycles);
+      if (!intervals.length) return DEFAULT_CYCLE_LENGTH;
+      const recent = intervals.slice(-3);
+      return Math.round(recent.reduce((s, d) => s + d, 0) / recent.length);
+    }
+
+    function getNextExpectedDate(cycles) {
+      if (!cycles || !cycles.length) return null;
+      const sorted = [...cycles].sort((a, b) => a.date.localeCompare(b.date));
+      const mostRecent = sorted[sorted.length - 1];
+      if (!isValidDate(mostRecent.date)) return null;
+      const d = new Date(mostRecent.date + 'T00:00:00');
+      d.setDate(d.getDate() + calculateAverageCycleLength(cycles));
+      return d.toISOString().split('T')[0];
+    }
+
+    function getStatusInfo(nextExpectedDate) {
+      if (!nextExpectedDate) return { label: 'No data yet', colorClass: 'bg-slate-700 text-slate-300' };
+      const daysUntil = getDaysUntil(nextExpectedDate);
+      if (daysUntil > 0)  return { label: `In ${daysUntil} day${daysUntil === 1 ? '' : 's'}`, colorClass: 'bg-slate-600 text-slate-200' };
+      if (daysUntil === 0) return { label: 'Expected today', colorClass: 'bg-amber-600 text-amber-100' };
+      const late = Math.abs(daysUntil);
+      if (late < 4) return { label: `${late} day${late === 1 ? '' : 's'} late`, colorClass: 'bg-amber-500 text-amber-100' };
+      return { label: 'Might want to check', colorClass: 'bg-red-600 text-red-100' };
+    }
+
+    // ── NOTIFICATIONS ──────────────────────────────────────────────────────────
+
+    const NOTIFY_DAYS_BEFORE = [0, 1, 2];
+    const NOTIFICATION_MESSAGES = [
+      'Time to update the calendar 📅',
+      'Quick check-in needed 🗓️',
+      'Your calendar has a reminder',
+      'Time to check your calendar',
+      'A gentle reminder from your calendar',
+    ];
+
+    async function requestNotificationPermission() {
+      if (!('Notification' in window)) return false;
+      if (Notification.permission === 'granted') return true;
+      if (Notification.permission === 'denied') return false;
+      return (await Notification.requestPermission()) === 'granted';
+    }
+
+    function checkAndSendNotification(cycles) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      const nextDate = getNextExpectedDate(cycles);
+      if (!nextDate) return;
+      const today = getTodayISO();
+      if (loadLastNotifiedDate() === today) return;
+      if (!NOTIFY_DAYS_BEFORE.includes(getDaysUntil(nextDate))) return;
+      saveLastNotifiedDate(today);
+      const msg = NOTIFICATION_MESSAGES[Math.floor(Math.random() * NOTIFICATION_MESSAGES.length)];
+      new Notification('Luna', {
+        body: msg,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        tag: 'luna-reminder',
+      });
+    }
+
+    function scheduleNotificationCheck(cycles) {
+      checkAndSendNotification(cycles);
+      return setInterval(() => checkAndSendNotification(cycles), 60 * 60 * 1000);
+    }
+
+    // ── COMPONENTS ─────────────────────────────────────────────────────────────
+
+    function Header({ notificationsEnabled, onToggleNotifications }) {
+      return html`
+        <header class="flex items-center justify-between px-4 py-4 border-b border-slate-700">
+          <div class="flex items-center gap-2">
+            <${Icon} d=${ICONS.calendar} cls="text-slate-400" />
+            <h1 class="text-lg font-semibold text-slate-100 tracking-tight">Luna</h1>
+          </div>
+          <button
+            onClick=${onToggleNotifications}
+            aria-label=${notificationsEnabled ? 'Disable reminders' : 'Enable reminders'}
+            title=${notificationsEnabled ? 'Disable reminders' : 'Enable reminders'}
+            class="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors"
+          >
+            <${Icon} d=${notificationsEnabled ? ICONS.bell : ICONS.bellOff} />
+          </button>
+        </header>`;
+    }
+
+    function NextExpected({ cycles }) {
+      const nextDate = getNextExpectedDate(cycles);
+      const { label, colorClass } = getStatusInfo(nextDate);
+      return html`
+        <section class="mx-4 mt-4 p-4 bg-slate-800 rounded-xl border border-slate-700">
+          <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Next Expected</p>
+          ${nextDate ? html`
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <p class="text-lg font-medium text-slate-100">${formatDate(nextDate)}</p>
+              <span class=${'text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ' + colorClass}>
+                ${label}
+              </span>
+            </div>
+          ` : html`
+            <p class="text-sm text-slate-400">Add your first entry to see a prediction.</p>
+          `}
+        </section>`;
+    }
+
+    function AddDateForm({ onSave, averageDuration }) {
+      const [isVisible, setIsVisible]     = useState(false);
+      const [selectedDate, setSelectedDate] = useState('');
+      const [errorMessage, setErrorMessage] = useState('');
+      const today = getTodayISO();
+
+      function handleSubmit(e) {
+        e.preventDefault();
+        if (!selectedDate) { setErrorMessage('Please select a date.'); return; }
+        if (selectedDate > today) { setErrorMessage('Date cannot be in the future.'); return; }
+        onSave(selectedDate);
+        setSelectedDate(''); setErrorMessage(''); setIsVisible(false);
+      }
+
+      function handleCancel() {
+        setSelectedDate(''); setErrorMessage(''); setIsVisible(false);
+      }
+
+      if (!isVisible) return html`
+        <div class="mx-4 mt-4">
+          <button
+            onClick=${() => setIsVisible(true)}
+            class="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <${Icon} d=${ICONS.plus} />
+            <span class="text-sm font-medium">Add cycle date</span>
+          </button>
+        </div>`;
+
+      return html`
+        <div class="mx-4 mt-4 p-4 bg-slate-800 rounded-xl border border-slate-700">
+          <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">New Entry</p>
+          <form onSubmit=${handleSubmit}>
+            <div class="mb-3">
+              <label for="cycle-date" class="block text-xs text-slate-400 mb-1">Start Date</label>
+              <input
+                id="cycle-date" type="date"
+                value=${selectedDate} max=${today}
+                onChange=${e => { setSelectedDate(e.target.value); setErrorMessage(''); }}
+                class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-slate-400"
+              />
+            </div>
+            <p class="text-xs text-slate-500 mb-3">Average duration: ${averageDuration} days (auto-recorded)</p>
+            ${errorMessage && html`<p class="text-red-400 text-xs mb-3">${errorMessage}</p>`}
+            <div class="flex gap-2">
+              <button
+                type="submit"
+                class="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-600 hover:bg-slate-500 text-slate-100 rounded-lg text-sm font-medium transition-colors"
+              >
+                <${Icon} d=${ICONS.check} />
+                Save
+              </button>
+              <button
+                type="button" onClick=${handleCancel}
+                class="flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-400 rounded-lg text-sm transition-colors"
+              >
+                <${Icon} d=${ICONS.x} />
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>`;
+    }
+
+    function ViewMode({ cycle, deleteArmed, onEdit, onDeleteFirstTap, onDeleteSecondTap, onDeleteBlur }) {
+      return html`
+        <>
+          <div class="space-y-1.5 mb-4">
+            ${cycle.duration ? html`
+              <p class="text-sm text-slate-300">
+                <span class="text-slate-500">Duration: </span>
+                ${cycle.duration} day${cycle.duration !== 1 ? 's' : ''}
+              </p>` : null}
+            ${cycle.notes ? html`
+              <p class="text-sm text-slate-300">
+                <span class="text-slate-500">Notes: </span>${cycle.notes}
+              </p>` : null}
+            ${!cycle.duration && !cycle.notes ? html`
+              <p class="text-xs text-slate-600">No additional details recorded.</p>` : null}
+          </div>
+          <div class="flex gap-2">
+            <button
+              onClick=${onEdit}
+              class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs transition-colors"
+            >
+              <${Icon} d=${ICONS.pencil} size=${14} />
+              Edit
+            </button>
+            <button
+              onClick=${deleteArmed ? onDeleteSecondTap : onDeleteFirstTap}
+              onBlur=${onDeleteBlur}
+              class=${'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ' +
+                (deleteArmed
+                  ? 'bg-red-700 hover:bg-red-600 text-red-100 font-medium'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300')}
+            >
+              <${Icon} d=${ICONS.trash} size=${14} />
+              ${deleteArmed ? 'Tap again to confirm' : 'Delete'}
+            </button>
+          </div>
+        </>`;
+    }
+
+    function EditMode({ editValues, today, onChange, onSave, onCancel }) {
+      const upd = (field, value) => onChange(prev => ({ ...prev, [field]: value }));
+      return html`
+        <>
+          <div class="space-y-3 mb-4">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Date</label>
+              <input
+                type="date" value=${editValues.date} max=${today}
+                onChange=${e => upd('date', e.target.value)}
+                class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-slate-400"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Duration (days)</label>
+              <input
+                type="number" value=${editValues.duration}
+                min="1" max="14" placeholder="e.g. 5"
+                onChange=${e => upd('duration', e.target.value)}
+                class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-slate-400"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Notes</label>
+              <textarea
+                value=${editValues.notes}
+                placeholder="Optional notes..."
+                rows=${2}
+                onChange=${e => upd('notes', e.target.value)}
+                class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-slate-400 resize-none"
+              ></textarea>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button
+              onClick=${onSave}
+              class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-100 rounded-lg text-xs font-medium transition-colors"
+            >
+              <${Icon} d=${ICONS.check} size=${14} />
+              Save changes
+            </button>
+            <button
+              onClick=${onCancel}
+              class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-400 rounded-lg text-xs transition-colors"
+            >
+              <${Icon} d=${ICONS.x} size=${14} />
+              Cancel
+            </button>
+          </div>
+        </>`;
+    }
+
+    function HistoryCard({ cycle, previousCycle, index, onUpdate, onDelete, isExpanded, onToggle }) {
+      const [mode, setMode]             = useState('view');
+      const [deleteArmed, setDeleteArmed] = useState(false);
+      const [editValues, setEditValues] = useState({
+        date:     cycle.date,
+        duration: cycle.duration || '',
+        notes:    cycle.notes    || '',
+      });
+
+      const today = getTodayISO();
+      const daysSincePrev = previousCycle ? getDaysBetween(previousCycle.date, cycle.date) : null;
+
+      function handleEditSave() {
+        if (!editValues.date || editValues.date > today) return;
+        onUpdate(index, {
+          ...cycle,
+          date:     editValues.date,
+          duration: editValues.duration ? Number(editValues.duration) : undefined,
+          notes:    editValues.notes    ? editValues.notes             : undefined,
+        });
+        setMode('view');
+      }
+
+      function handleEditCancel() {
+        setEditValues({ date: cycle.date, duration: cycle.duration || '', notes: cycle.notes || '' });
+        setMode('view');
+      }
+
+      function handleToggleExpand() {
+        onToggle(index);
+        if (isExpanded) { setDeleteArmed(false); setMode('view'); }
+      }
+
+      return html`
+        <article class="mx-4 mt-3 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+          <button
+            onClick=${handleToggleExpand}
+            class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-700 transition-colors"
+          >
+            <div>
+              <p class="text-sm font-medium text-slate-100">${formatDate(cycle.date)}</p>
+              ${daysSincePrev !== null ? html`
+                <p class="text-xs text-slate-500 mt-0.5">${daysSincePrev} days from previous</p>
+              ` : null}
+            </div>
+            <${Icon}
+              d=${isExpanded ? ICONS.chevronUp : ICONS.chevronDown}
+              cls="text-slate-500 flex-shrink-0"
+            />
+          </button>
+          ${isExpanded ? html`
+            <div class="border-t border-slate-700 px-4 py-3">
+              ${mode === 'view' ? html`
+                <${ViewMode}
+                  cycle=${cycle}
+                  deleteArmed=${deleteArmed}
+                  onEdit=${() => { setMode('edit'); setDeleteArmed(false); }}
+                  onDeleteFirstTap=${() => setDeleteArmed(true)}
+                  onDeleteSecondTap=${() => onDelete(index)}
+                  onDeleteBlur=${() => setTimeout(() => setDeleteArmed(false), 150)}
+                />
+              ` : html`
+                <${EditMode}
+                  editValues=${editValues}
+                  today=${today}
+                  onChange=${setEditValues}
+                  onSave=${handleEditSave}
+                  onCancel=${handleEditCancel}
+                />
+              `}
+            </div>
+          ` : null}
+        </article>`;
+    }
+
+    // ── APP ROOT ───────────────────────────────────────────────────────────────
+
+    function App() {
+      const [cycles, setCycles]                         = useState([]);
+      const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+      const [expandedCardIndex, setExpandedCardIndex]   = useState(null);
+
+      useEffect(() => {
+        const saved = loadCycles();
+        setCycles(saved.sort((a, b) => b.date.localeCompare(a.date)));
+        setNotificationsEnabled(loadNotificationPreference());
+      }, []);
+
+      useEffect(() => { saveCycles(cycles); }, [cycles]);
+
+      useEffect(() => {
+        if (!notificationsEnabled) return;
+        const id = scheduleNotificationCheck(cycles);
+        return () => clearInterval(id);
+      }, [notificationsEnabled, cycles]);
+
+      function handleAddCycle(date) {
+        setCycles(prev => [{ date }, ...prev].sort((a, b) => b.date.localeCompare(a.date)));
+        setExpandedCardIndex(null);
+      }
+
+      function handleUpdateCycle(index, updated) {
+        setCycles(prev => {
+          const arr = [...prev];
+          arr[index] = updated;
+          return arr.sort((a, b) => b.date.localeCompare(a.date));
+        });
+      }
+
+      function handleDeleteCycle(index) {
+        setCycles(prev => prev.filter((_, i) => i !== index));
+        setExpandedCardIndex(null);
+      }
+
+      async function handleToggleNotifications() {
+        if (notificationsEnabled) {
+          setNotificationsEnabled(false);
+          saveNotificationPreference(false);
+          return;
+        }
+        const granted = await requestNotificationPermission();
+        if (granted) { setNotificationsEnabled(true); saveNotificationPreference(true); }
+      }
+
+      function handleToggleCard(index) {
+        setExpandedCardIndex(prev => prev === index ? null : index);
+      }
+
+      const oldestFirst    = [...cycles].sort((a, b) => a.date.localeCompare(b.date));
+      const averageDuration = calculateAverageDuration(cycles);
+
+      return html`
+        <div class="min-h-screen bg-slate-900 text-slate-100">
+          <div class="max-w-md mx-auto pb-12">
+            <${Header}
+              notificationsEnabled=${notificationsEnabled}
+              onToggleNotifications=${handleToggleNotifications}
+            />
+            <${NextExpected} cycles=${cycles} />
+            <${AddDateForm} onSave=${handleAddCycle} averageDuration=${averageDuration} />
+            ${cycles.length > 0 ? html`
+              <div class="mx-4 mt-6 mb-2">
+                <p class="text-xs uppercase tracking-wider text-slate-500">History</p>
+              </div>
+            ` : null}
+            ${cycles.map((cycle, index) => {
+              const ci = oldestFirst.findIndex(c => c.date === cycle.date);
+              const prev = ci > 0 ? oldestFirst[ci - 1] : null;
+              return html`<${HistoryCard}
+                key=${cycle.date + '-' + index}
+                cycle=${cycle}
+                previousCycle=${prev}
+                index=${index}
+                onUpdate=${handleUpdateCycle}
+                onDelete=${handleDeleteCycle}
+                isExpanded=${expandedCardIndex === index}
+                onToggle=${handleToggleCard}
+              />`;
+            })}
+          </div>
+        </div>`;
+    }
+
+    render(html`<${App} />`, document.getElementById('root'));
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js')
+        .catch(e => console.warn('SW registration failed:', e));
+    }
+  </script>
+</body>
+</html>
