@@ -143,6 +143,10 @@
       try { return localStorage.getItem(KEY_LAST_NOTIF) || null; } catch (e) { return null; }
     }
 
+    const KEY_NOTIF_DAYS = 'notif-days-before';
+    function saveNotifDaysBefore(n) { try { localStorage.setItem(KEY_NOTIF_DAYS, String(n)); } catch(e) {} }
+    function loadNotifDaysBefore() { try { return Number(localStorage.getItem(KEY_NOTIF_DAYS) ?? 1); } catch(e) { return 1; } }
+
     // ── CALCULATIONS ───────────────────────────────────────────────────────────
 
     const DEFAULT_CYCLE_DURATION = 5;
@@ -172,6 +176,18 @@
       return Math.round(recent.reduce((s, d) => s + d, 0) / recent.length);
     }
 
+    function getShortestCycle(cycles) {
+      const intervals = getCycleIntervals(cycles);
+      if (!intervals.length) return null;
+      return Math.min(...intervals);
+    }
+
+    function getLongestCycle(cycles) {
+      const intervals = getCycleIntervals(cycles);
+      if (!intervals.length) return null;
+      return Math.max(...intervals);
+    }
+
     function getNextExpectedDate(cycles) {
       if (!cycles || !cycles.length) return null;
       const sorted = [...cycles].sort((a, b) => a.date.localeCompare(b.date));
@@ -194,7 +210,6 @@
 
     // ── NOTIFICATIONS ──────────────────────────────────────────────────────────
 
-    const NOTIFY_DAYS_BEFORE = [0, 1, 2];
     const NOTIFICATION_MESSAGES = [
       'Time to update the calendar 📅',
       'Quick check-in needed 🗓️',
@@ -210,13 +225,14 @@
       return (await Notification.requestPermission()) === 'granted';
     }
 
-    function checkAndSendNotification(cycles) {
+    function checkAndSendNotification(cycles, daysBefore) {
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
       const nextDate = getNextExpectedDate(cycles);
       if (!nextDate) return;
       const today = getTodayISO();
       if (loadLastNotifiedDate() === today) return;
-      if (!NOTIFY_DAYS_BEFORE.includes(getDaysUntil(nextDate))) return;
+      const daysUntil = getDaysUntil(nextDate);
+      if (daysUntil < 0 || daysUntil > daysBefore) return;
       saveLastNotifiedDate(today);
       const msg = NOTIFICATION_MESSAGES[Math.floor(Math.random() * NOTIFICATION_MESSAGES.length)];
       new Notification('Luna', {
@@ -225,11 +241,6 @@
         badge: '/icons/icon-192.png',
         tag: 'luna-reminder',
       });
-    }
-
-    function scheduleNotificationCheck(cycles) {
-      checkAndSendNotification(cycles);
-      return setInterval(() => checkAndSendNotification(cycles), 60 * 60 * 1000);
     }
 
     // ── COMPONENTS ─────────────────────────────────────────────────────────────
@@ -252,6 +263,50 @@
         </header>`;
     }
 
+    function NotificationPanel({ notifDaysBefore, onChangeDaysBefore, nextExpectedDate }) {
+      const options = [
+        { value: 0, label: 'Day of' },
+        { value: 1, label: '1 day before' },
+        { value: 3, label: '3 days before' },
+        { value: 5, label: '5 days before' },
+        { value: 7, label: '1 week before' },
+      ];
+
+      let reminderText;
+      if (!nextExpectedDate) {
+        reminderText = 'No data yet';
+      } else {
+        const d = new Date(nextExpectedDate + 'T00:00:00');
+        d.setDate(d.getDate() - notifDaysBefore);
+        const reminderISO = d.toISOString().split('T')[0];
+        const today = getTodayISO();
+        if (reminderISO < today) {
+          reminderText = 'Passed — will show at next cycle';
+        } else {
+          reminderText = formatDate(reminderISO);
+        }
+      }
+
+      return html`
+        <section class="mx-4 mt-4 p-4 bg-slate-800 rounded-xl border border-slate-700">
+          <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Reminders</p>
+          <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+            <label class="text-sm text-slate-300" for="notif-days-select">Remind me starting</label>
+            <select
+              id="notif-days-select"
+              value=${notifDaysBefore}
+              onChange=${e => onChangeDaysBefore(Number(e.target.value))}
+              class="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-slate-100 text-sm focus:outline-none focus:border-slate-400"
+            >
+              ${options.map(o => html`<option value=${o.value}>${o.label}</option>`)}
+            </select>
+          </div>
+          <p class="text-xs text-slate-400">
+            <span class="text-slate-500">Next reminder: </span>${reminderText}
+          </p>
+        </section>`;
+    }
+
     function NextExpected({ cycles }) {
       const nextDate = getNextExpectedDate(cycles);
       const { label, colorClass } = getStatusInfo(nextDate);
@@ -268,6 +323,27 @@
           ` : html`
             <p class="text-sm text-slate-400">Add your first entry to see a prediction.</p>
           `}
+        </section>`;
+    }
+
+    function CycleStats({ cycles }) {
+      if (!cycles || cycles.length < 2) return null;
+      const avg      = calculateAverageCycleLength(cycles);
+      const shortest = getShortestCycle(cycles);
+      const longest  = getLongestCycle(cycles);
+      const duration = calculateAverageDuration(cycles);
+      const row = (label, value) => html`
+        <div class="flex items-center justify-between py-1.5">
+          <span class="text-sm text-slate-500">${label}</span>
+          <span class="text-sm text-slate-100">${value} days</span>
+        </div>`;
+      return html`
+        <section class="mx-4 mt-4 p-4 bg-slate-800 rounded-xl border border-slate-700">
+          <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Cycle Stats</p>
+          ${row('Average length', avg)}
+          ${row('Shortest cycle', shortest)}
+          ${row('Longest cycle', longest)}
+          ${row('Average period', duration)}
         </section>`;
     }
 
@@ -507,20 +583,33 @@
       const [cycles, setCycles]                         = useState([]);
       const [notificationsEnabled, setNotificationsEnabled] = useState(false);
       const [expandedCardIndex, setExpandedCardIndex]   = useState(null);
+      const [notifDaysBefore, setNotifDaysBefore]       = useState(1);
 
       useEffect(() => {
         const saved = loadCycles();
         setCycles(saved.sort((a, b) => b.date.localeCompare(a.date)));
         setNotificationsEnabled(loadNotificationPreference());
+        setNotifDaysBefore(loadNotifDaysBefore());
       }, []);
 
       useEffect(() => { saveCycles(cycles); }, [cycles]);
 
       useEffect(() => {
         if (!notificationsEnabled) return;
-        const id = scheduleNotificationCheck(cycles);
+        checkAndSendNotification(cycles, notifDaysBefore);
+        const id = setInterval(() => checkAndSendNotification(cycles, notifDaysBefore), 60 * 60 * 1000);
         return () => clearInterval(id);
-      }, [notificationsEnabled, cycles]);
+      }, [notificationsEnabled, cycles, notifDaysBefore]);
+
+      useEffect(() => {
+        if (!notificationsEnabled) return;
+        const onVisible = () => {
+          if (document.visibilityState === 'visible')
+            checkAndSendNotification(cycles, notifDaysBefore);
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => document.removeEventListener('visibilitychange', onVisible);
+      }, [notificationsEnabled, cycles, notifDaysBefore]);
 
       function handleAddCycle(date) {
         setCycles(prev => [{ date }, ...prev].sort((a, b) => b.date.localeCompare(a.date)));
@@ -550,6 +639,11 @@
         if (granted) { setNotificationsEnabled(true); saveNotificationPreference(true); }
       }
 
+      function handleChangeDaysBefore(n) {
+        setNotifDaysBefore(n);
+        saveNotifDaysBefore(n);
+      }
+
       function handleToggleCard(index) {
         setExpandedCardIndex(prev => prev === index ? null : index);
       }
@@ -564,7 +658,15 @@
               notificationsEnabled=${notificationsEnabled}
               onToggleNotifications=${handleToggleNotifications}
             />
+            ${notificationsEnabled ? html`
+              <${NotificationPanel}
+                notifDaysBefore=${notifDaysBefore}
+                onChangeDaysBefore=${handleChangeDaysBefore}
+                nextExpectedDate=${getNextExpectedDate(cycles)}
+              />
+            ` : null}
             <${NextExpected} cycles=${cycles} />
+            <${CycleStats} cycles=${cycles} />
             <${AddDateForm} onSave=${handleAddCycle} averageDuration=${averageDuration} />
             ${cycles.length > 0 ? html`
               <div class="mx-4 mt-6 mb-2">

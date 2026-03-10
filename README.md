@@ -61,8 +61,9 @@ No build step required — all dependencies load from CDN.
 - Track cycle start dates
 - Automatically calculates average cycle length from the last 3 cycles
 - Shows next expected date with color-coded status (on-track / late / very late)
+- Cycle stats card: average, shortest, and longest cycle length + average period duration
 - Edit any past entry (date, duration, notes)
 - Two-tap delete confirmation
-- Optional discreet daily reminders (uses generic messages — no medical terminology)
+- Optional discreet daily reminders with configurable lead time (uses generic messages — no medical terminology)
 - Fully offline after first load
 - All data stays on your device (localStorage only)
