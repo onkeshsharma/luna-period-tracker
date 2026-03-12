@@ -1,123 +1,174 @@
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Shadcn tokens ─── */
+@layer base {
+
+  /* Shared defaults (cosmic/dark) */
+  :root {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+    --card: 224 71% 4%;
+    --card-foreground: 213 31% 91%;
+    --popover: 224 71% 4%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 216 34% 17%;
+    --input: 216 34% 17%;
+    --ring: 212.7 26.8% 83.9%;
+    --radius: 0.75rem;
+
+    /* Luna theme tokens */
+    --luna-bg-a: #0f172a;
+    --luna-bg-b: #1e1b4b;
+    --luna-bg-c: #1a0f2e;
+    --luna-glass-bg: rgba(15, 23, 42, 0.65);
+    --luna-glass-border: rgba(139, 92, 246, 0.18);
+    --luna-accent: #f43f5e;
+    --luna-accent-soft: #a78bfa;
+    --luna-text-1: #f1f5f9;
+    --luna-text-2: #94a3b8;
+    --luna-text-3: #64748b;
+    --luna-orb-a: rgba(139, 92, 246, 0.35);
+    --luna-orb-b: rgba(244, 63, 94, 0.25);
+    --luna-orb-c: rgba(30, 27, 75, 0.4);
+    --luna-shimmer-a: #f8fafc;
+    --luna-shimmer-b: #f43f5e;
+    --luna-shimmer-c: #a78bfa;
+  }
+
+  /* ── COSMIC ── */
+  [data-theme="cosmic"] {
+    --luna-bg-a: #0d0a1e;
+    --luna-bg-b: #1a1040;
+    --luna-bg-c: #0f0a1e;
+    --luna-glass-bg: rgba(15, 10, 40, 0.60);
+    --luna-glass-border: rgba(167, 139, 250, 0.20);
+    --luna-accent: #f43f5e;
+    --luna-accent-soft: #c084fc;
+    --luna-text-1: #f1f5f9;
+    --luna-text-2: #c4b5fd;
+    --luna-text-3: #7c3aed;
+    --luna-orb-a: rgba(124, 58, 237, 0.40);
+    --luna-orb-b: rgba(244, 63, 94, 0.22);
+    --luna-orb-c: rgba(192, 132, 252, 0.15);
+    --luna-shimmer-a: #f8fafc;
+    --luna-shimmer-b: #f43f5e;
+    --luna-shimmer-c: #c084fc;
+    --luna-overlay: rgba(8, 4, 22, 0.70);
+  }
+
+  /* ── SAKURA (light) ── */
+  [data-theme="sakura"] {
+    --background: 340 80% 98%;
+    --foreground: 340 50% 18%;
+    --card: 340 70% 96%;
+    --card-foreground: 340 50% 18%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 340 50% 18%;
+    --muted: 340 40% 92%;
+    --muted-foreground: 340 30% 45%;
+    --border: 340 40% 85%;
+    --input: 340 40% 90%;
+    --primary: 340 80% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --luna-bg-a: #fff0f5;
+    --luna-bg-b: #fce7f3;
+    --luna-bg-c: #fdf2f8;
+    --luna-glass-bg: rgba(255, 255, 255, 0.72);
+    --luna-glass-border: rgba(236, 72, 153, 0.20);
+    --luna-accent: #db2777;
+    --luna-accent-soft: #f9a8d4;
+    --luna-text-1: #500724;
+    --luna-text-2: #9d174d;
+    --luna-text-3: #be185d;
+    --luna-orb-a: rgba(251, 207, 232, 0.80);
+    --luna-orb-b: rgba(253, 242, 248, 0.90);
+    --luna-orb-c: rgba(244, 114, 182, 0.25);
+    --luna-shimmer-a: #500724;
+    --luna-shimmer-b: #db2777;
+    --luna-shimmer-c: #f472b6;
+    --luna-overlay: rgba(253, 228, 240, 0.80);
+  }
+}
+
+/* ─── Base styles ─── */
 @layer base {
   * {
+    @apply border-border;
     -webkit-tap-highlight-color: transparent;
-    @apply border-border outline-ring/50;
   }
-  :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.809 0.105 251.813);
-    --chart-2: oklch(0.623 0.214 259.815);
-    --chart-3: oklch(0.546 0.245 262.881);
-    --chart-4: oklch(0.488 0.243 264.376);
-    --chart-5: oklch(0.424 0.199 265.638);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-  }
-  .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.809 0.105 251.813);
-    --chart-2: oklch(0.623 0.214 259.815);
-    --chart-3: oklch(0.546 0.245 262.881);
-    --chart-4: oklch(0.488 0.243 264.376);
-    --chart-5: oklch(0.424 0.199 265.638);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-  }
-  .theme {
-    --font-sans: 'Geist Variable', sans-serif;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
-  }
-}
 
-@layer components {
-  /* ── Card glassmorphism ─────────────────────────────────────────────────── */
-  .glass {
-    background: rgba(30,41,59,0.72) !important;
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-  .glass:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.35); }
-
-  /* ── Input styling ──────────────────────────────────────────────────────── */
-  input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(0.6); cursor:pointer; }
-}
-
-@layer utilities {
-  /* ── Animated gradient background ──────────────────────────────────────── */
-  .bg-animated-gradient {
-    background: linear-gradient(-45deg,#0f172a,#1e1b4b,#0f172a,#1a0f2e);
-    background-size: 400% 400%;
-    animation: gradShift 18s ease infinite;
+  html, body {
     min-height: 100vh;
   }
 
-  .anim-fade-in-up  { animation: fadeInUp 0.35s cubic-bezier(0.22,1,0.36,1) both; }
-  .anim-pulse-dot   { animation: pulseDot 1.8s ease-in-out infinite; }
+  body {
+    @apply text-foreground;
+    background: var(--luna-bg-a);
+    color: var(--luna-text-1);
+    font-family: 'Inter', system-ui, sans-serif;
+  }
 
-  /* ── Shimmer on header title ────────────────────────────────────────────── */
+  /* Fix all slate-* text references to use luna tokens */
+  .text-slate-100  { color: var(--luna-text-1) !important; }
+  .text-slate-200  { color: var(--luna-text-1) !important; }
+  .text-slate-300  { color: var(--luna-text-2) !important; }
+  .text-slate-400  { color: var(--luna-text-3) !important; }
+  .text-slate-500  { color: var(--luna-text-3) !important; }
+}
+
+/* ─── Components ─── */
+@layer components {
+  .glass {
+    background: var(--luna-glass-bg) !important;
+    border: 1px solid var(--luna-glass-border) !important;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    transition: box-shadow 0.2s, border-color 0.2s;
+  }
+
+  .glass:hover {
+    border-color: color-mix(in srgb, var(--luna-glass-border), transparent 20%) !important;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
+  }
+
+  .luna-card {
+    @apply glass rounded-2xl;
+    padding: 1.25rem;
+    margin: 0 1rem;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.6);
+    cursor: pointer;
+  }
+}
+
+/* ─── Utilities ─── */
+@layer utilities {
+  .anim-fade-in-up { animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .anim-pulse-dot  { animation: pulseDot 2s ease-in-out infinite; }
+
   .shimmer-text {
-    background: linear-gradient(90deg,#f8fafc 0%,#f43f5e 40%,#a78bfa 60%,#f8fafc 100%);
+    background: linear-gradient(
+      90deg,
+      var(--luna-shimmer-a) 0%,
+      var(--luna-shimmer-b) 40%,
+      var(--luna-shimmer-c) 60%,
+      var(--luna-shimmer-a) 100%
+    );
     background-size: 200% auto;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -125,27 +176,61 @@
     animation: shimmer 4s linear infinite;
   }
 
-  /* ── Pet ──────────────────────────────────────────────────────────────────*/
   .pet-bubble {
-    animation: bubblePop 0.3s cubic-bezier(0.22,1,0.36,1) both;
-    background: rgba(15,23,42,0.88);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255,255,255,0.12);
+    animation: bubblePop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+    background: var(--luna-glass-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--luna-glass-border);
+    color: var(--luna-text-1);
   }
 
-  /* ── Accent glow on rose elements ──────────────────────────────────────── */
   .glow-pulse { animation: glowPulse 3s ease-in-out infinite; }
+
+  /* SVG Moon character animation states */
+  .luna-idle      { animation: lunaBob 2.8s ease-in-out infinite; }
+  .luna-bounce    { animation: lunaJump 0.55s ease-in-out infinite; }
+  .luna-sleep     { animation: lunaSway 3.5s ease-in-out infinite; }
+  .luna-dance     { animation: lunaDance 0.45s ease-in-out infinite; }
+  .luna-surprised { animation: lunaShake 0.12s ease-in-out 6; }
+  .luna-walk-bob  { animation: lunaWalkBob 0.4s ease-in-out infinite; }
 }
 
-/* ── Keyframes ─────────────────────────────────────────────────────────── */
-@keyframes gradShift  { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-@keyframes fadeInUp  { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
-@keyframes pulseDot  { 0%,100%{transform:scale(1)} 50%{transform:scale(1.35)} }
-@keyframes petIdle   { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-8px) rotate(2deg)} }
-@keyframes petWalk   { 0%{left:-80px;transform:scaleX(1)} 100%{left:calc(100% + 80px);transform:scaleX(1)} }
-@keyframes petWalkL  { 0%{right:-80px;transform:scaleX(-1)} 100%{right:calc(100% + 80px);transform:scaleX(-1)} }
-@keyframes petSleep  { 0%,100%{opacity:1;transform:rotate(-15deg) scale(0.9)} 50%{opacity:0.5;transform:rotate(-15deg) scale(0.85)} }
-@keyframes petCelebrate { 0%{transform:scale(1) rotate(0)} 20%{transform:scale(1.5) rotate(-15deg)} 40%{transform:scale(1.3) rotate(15deg)} 60%{transform:scale(1.4) rotate(-10deg)} 80%{transform:scale(1.2) rotate(10deg)} 100%{transform:scale(1) rotate(0)} }
-@keyframes bubblePop { 0%{opacity:0;transform:scale(0.5) translateY(10px)} 70%{transform:scale(1.05) translateY(-2px)} 100%{opacity:1;transform:scale(1) translateY(0)} }
-@keyframes shimmer   { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-@keyframes glowPulse { 0%,100%{box-shadow:0 0 10px rgba(244,63,94,0.3)} 50%{box-shadow:0 0 24px rgba(244,63,94,0.7)} }
+/* ─── Keyframes ─── */
+@keyframes fadeInUp     { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes pulseDot     { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+@keyframes shimmer      { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes bubblePop    { 0% { opacity: 0; transform: scale(0.5) translateY(10px); } 70% { transform: scale(1.05) translateY(-2px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes glowPulse    { 0%, 100% { box-shadow: 0 0 12px rgba(244, 63, 94, 0.3); } 50% { box-shadow: 0 0 28px rgba(244, 63, 94, 0.65); } }
+@keyframes petIdle      { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-8px) rotate(2deg); } }
+@keyframes petWalk      { 0% { left: -80px; transform: scaleX(1); } 100% { left: calc(100% + 80px); transform: scaleX(1); } }
+@keyframes petWalkL     { 0% { right: -80px; transform: scaleX(-1); } 100% { right: calc(100% + 80px); transform: scaleX(-1); } }
+@keyframes petSleep     { 0%, 100% { opacity: 1; transform: rotate(-15deg) scale(0.9); } 50% { opacity: 0.5; transform: rotate(-15deg) scale(0.85); } }
+@keyframes petCelebrate { 0% { transform: scale(1) rotate(0); } 20% { transform: scale(1.5) rotate(-15deg); } 40% { transform: scale(1.3) rotate(15deg); } 60% { transform: scale(1.4) rotate(-10deg); } 80% { transform: scale(1.2) rotate(10deg); } 100% { transform: scale(1) rotate(0); } }
+@keyframes lunaBob      { 0%,100% { transform: translateY(0); }     50% { transform: translateY(-7px); } }
+@keyframes lunaJump     { 0%,100% { transform: translateY(0) scaleY(1); }   40% { transform: translateY(-14px) scaleY(1.05); } 80% { transform: translateY(2px) scaleY(0.92); } }
+@keyframes lunaSway     { 0%,100% { transform: rotate(-4deg); }     50% { transform: rotate(4deg); } }
+@keyframes lunaDance    { 0%,100% { transform: rotate(-8deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-5px); } }
+@keyframes lunaShake    { 0%,100% { transform: translateX(0); }     25% { transform: translateX(-5px); }     75% { transform: translateX(5px); } }
+@keyframes lunaWalkBob  { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-4px) rotate(2deg); } }
+@keyframes petZzz      { 0% { opacity: 0; transform: translateY(0) scale(0.7); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateY(-18px) scale(1.1); } }
+@keyframes petSparkle  { 0%, 100% { opacity: 0; transform: scale(0.5) rotate(0deg); } 50% { opacity: 1; transform: scale(1.2) rotate(20deg); } }
+@keyframes petFloat    { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-4px); } }
+@keyframes petBubble   { 0% { opacity: 0; transform: translateX(-50%) scale(0.6) translateY(8px); } 70% { transform: translateX(-50%) scale(1.04) translateY(-1px); } 100% { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); } }
+
+@keyframes orbFloat1 {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(60px, -40px) scale(1.08); }
+  66%  { transform: translate(-30px, 50px) scale(0.94); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes orbFloat2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(-50px, 60px) scale(1.06); }
+  66%  { transform: translate(40px, -30px) scale(0.96); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes orbFloat3 {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(30px, 30px) scale(1.04); }
+  100% { transform: translate(0, 0) scale(1); }
+}

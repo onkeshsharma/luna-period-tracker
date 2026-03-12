@@ -4,7 +4,7 @@ import { useTheme } from './hooks/useTheme';
 import {
   loadCycles, saveCycles, loadNotificationPreference, saveNotificationPreference,
   loadLastNotifiedDate, saveLastNotifiedDate, loadNotifDaysBefore, saveNotifDaysBefore,
-  calculateAverageDuration, getNextExpectedDate, getTodayISO, getDaysBetween, getDaysUntil
+  calculateAverageDuration, calculateAverageCycleLength, getNextExpectedDate, getTodayISO, getDaysBetween, getDaysUntil
 } from './utils';
 import { Header } from './components/Header';
 import { NotificationPanel } from './components/NotificationPanel';
@@ -13,6 +13,8 @@ import { CycleCalendar } from './components/CycleCalendar';
 import { CyclePhaseWheel } from './components/CyclePhaseWheel';
 import { AddDateForm } from './components/AddDateForm';
 import { HistoryCard } from './components/HistoryCard';
+import { StatsChart } from './components/StatsChart';
+import { BackgroundOrbs } from './components/BackgroundOrbs';
 import { Pet } from './components/Pet';
 
 const NOTIFICATION_MESSAGES = [
@@ -63,6 +65,17 @@ function App() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [expandedCardDate, setExpandedCardDate]     = useState(null);
   const [notifDaysBefore, setNotifDaysBefore]       = useState(1);
+  const [isAddModalOpen, setIsAddModalOpen]         = useState(false);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
+  const [showChart, setShowChart] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('luna-show-chart') || 'false'); } catch { return false; }
+  });
+  const [showPhase, setShowPhase] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('luna-show-phase') || 'true'); } catch { return true; }
+  });
+  const [showPet, setShowPet] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('luna-show-pet') || 'true'); } catch { return true; }
+  });
 
   useEffect(() => {
     const saved = loadCycles();
@@ -72,6 +85,10 @@ function App() {
   }, []);
 
   useEffect(() => { saveCycles(cycles); }, [cycles]);
+  useEffect(() => { try { localStorage.setItem('luna-show-chart', JSON.stringify(showChart)); } catch {} }, [showChart]);
+  useEffect(() => { try { localStorage.setItem('luna-show-phase', JSON.stringify(showPhase)); } catch {} }, [showPhase]);
+  useEffect(() => { try { localStorage.setItem('luna-show-pet',   JSON.stringify(showPet));   } catch {} }, [showPet]);
+
 
   useEffect(() => {
     if (!notificationsEnabled) return;
@@ -90,9 +107,13 @@ function App() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [notificationsEnabled, cycles, notifDaysBefore]);
 
-  function handleAddCycle(date, duration) {
+  function handleAddCycle(date, duration, trackingData) {
     const entry = { date };
     if (duration && duration > 0) entry.duration = duration;
+    if (trackingData && trackingData.flow) entry.flow = trackingData.flow;
+    if (trackingData && trackingData.mood) entry.mood = trackingData.mood;
+    if (trackingData && trackingData.symptoms) entry.symptoms = trackingData.symptoms;
+
     setCycles(prev => [entry, ...prev].sort((a, b) => b.date.localeCompare(a.date)));
     setExpandedCardDate(null);
     spawnConfetti();
@@ -122,6 +143,37 @@ function App() {
     if (granted) { setNotificationsEnabled(true); saveNotificationPreference(true); }
   }
 
+  function handleExportData() {
+    const dataStr = JSON.stringify(cycles, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+    const exportFileDefaultName = 'luna-backup.json';
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  }
+
+  function handleImportData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target.result);
+        if (Array.isArray(imported)) {
+          setCycles(imported.sort((a,b) => b.date.localeCompare(a.date)));
+          alert("Data imported successfully! Welcome back.");
+        } else {
+          alert("Invalid data format.");
+        }
+      } catch (err) {
+        alert("Error parsing file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // reset input
+  }
+
   function handleChangeDaysBefore(n) {
     setNotifDaysBefore(n);
     saveNotifDaysBefore(n);
@@ -131,29 +183,51 @@ function App() {
     setExpandedCardDate(prev => prev === date ? null : date);
   }
 
+  function handleCalendarDayClick(isoDate) {
+    const todayStr = getTodayISO();
+    if (isoDate > todayStr) return; // Prevent logging future dates directly from calendar
+    // Create date appending time to avoid UTC offset issues shifting it back a day
+    setSelectedCalendarDate(new Date(isoDate + 'T12:00:00'));
+    setIsAddModalOpen(true);
+  }
+
   const oldestFirst    = [...cycles].sort((a, b) => a.date.localeCompare(b.date));
   const averageDuration = calculateAverageDuration(cycles);
 
-  // Compute current phase for pet
   let currentPhaseForPet = 'Luteal';
   if (cycles.length >= 1) {
     const sorted2    = [...cycles].sort((a, b) => a.date.localeCompare(b.date));
     const lastP      = sorted2[sorted2.length - 1];
     const cd         = getDaysBetween(lastP.date, getTodayISO()) + 1;
+    
     const avgDur2    = calculateAverageDuration(cycles);
+    const avgLen     = calculateAverageCycleLength(cycles);
+    
+    const lutealLength = 14;
+    const ovulationLength = 4;
+    const lutealStart = Math.max(avgDur2 + ovulationLength + 1, avgLen - lutealLength + 1);
+    const ovulationStart = Math.max(avgDur2 + 1, lutealStart - ovulationLength);
+
     if (cd >= 1 && cd <= avgDur2) currentPhaseForPet = 'Menstrual';
-    else if (cd <= 12) currentPhaseForPet = 'Follicular';
-    else if (cd <= 16) currentPhaseForPet = 'Ovulation';
+    else if (cd >= avgDur2 + 1 && cd < ovulationStart) currentPhaseForPet = 'Follicular';
+    else if (cd >= ovulationStart && cd < lutealStart) currentPhaseForPet = 'Ovulation';
+    else currentPhaseForPet = 'Luteal';
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
-      <div className="max-w-md mx-auto pb-24 w-full">
+    <div className="min-h-screen flex flex-col font-sans" style={{ color: 'var(--luna-text-1)', position: 'relative' }}>
+      <BackgroundOrbs />
+      <div className="max-w-md mx-auto pb-24 w-full" style={{ position: 'relative', zIndex: 1 }}>
         <Header
           notificationsEnabled={notificationsEnabled}
           onToggleNotifications={handleToggleNotifications}
           onCycleTheme={cycleTheme}
           theme={theme}
+          onExportData={handleExportData}
+          onImportData={handleImportData}
+          showChart={showChart}  onToggleChart={() => setShowChart(p => !p)}
+          showPhase={showPhase}  onTogglePhase={() => setShowPhase(p => !p)}
+          showPet={showPet}      onTogglePet={() => setShowPet(p => !p)}
         />
         {notificationsEnabled && (
           <NotificationPanel
@@ -163,12 +237,20 @@ function App() {
           />
         )}
         <NextExpected cycles={cycles} />
-        <CycleCalendar cycles={cycles} />
-        <CyclePhaseWheel cycles={cycles} />
-        <AddDateForm onSave={handleAddCycle} averageDuration={averageDuration} />
+        <CycleCalendar cycles={cycles} onDateClick={handleCalendarDayClick} />
+        {showPhase && <CyclePhaseWheel cycles={cycles} />}
+        <AddDateForm 
+          isOpen={isAddModalOpen} 
+          onClose={() => setIsAddModalOpen(false)}
+          defaultDate={selectedCalendarDate}
+          onSave={handleAddCycle} 
+          averageDuration={averageDuration}
+          cycles={cycles}
+        />
+        {showChart && <StatsChart cycles={cycles} />}
         {cycles.length > 0 && (
           <div className="mx-4 mt-6 mb-2">
-            <p className="text-xs uppercase tracking-wider text-slate-500">History</p>
+            <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--luna-text-3)' }}>History</p>
           </div>
         )}
         {cycles.map((cycle) => {
@@ -187,8 +269,8 @@ function App() {
           );
         })}
       </div>
-      <p className="text-center text-slate-700 text-xs mt-auto pb-6">v10 React</p>
-      <Pet currentPhase={currentPhaseForPet} />
+
+      {showPet && <Pet currentPhase={currentPhaseForPet} cycles={cycles} />}
     </div>
   );
 }

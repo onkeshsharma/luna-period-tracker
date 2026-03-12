@@ -3,29 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Luna</title>
+  <title>Luna – Period Tracker</title>
 
-  <!-- PWA meta tags -->
-  <meta name="theme-color"                           content="#0f172a" />
+  <!-- SEO -->
+  <meta name="description" content="Your smart, private period and cycle tracking companion. 100% on-device, no account needed." />
+
+  <!-- PWA -->
+  <meta name="theme-color"                           content="#1e1b4b" />
   <meta name="apple-mobile-web-app-capable"          content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title"            content="Luna" />
   <meta name="mobile-web-app-capable"                content="yes" />
-  <meta name="application-name"                      content="Luna" />
-  <meta name="description"                           content="Simple calendar tracking" />
 
-  <link rel="manifest"         href="/manifest.json" />
   <link rel="apple-touch-icon" href="/icons/icon-512.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
 </head>
-<body class="bg-animated-gradient">
+<body>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js')
-        .catch(e => console.warn('SW registration failed:', e));
-    }
-  </script>
 </body>
 </html>
