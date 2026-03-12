@@ -12,12 +12,21 @@ export function CyclePhaseWheel({ cycles }) {
   const cycleDay   = getDaysBetween(lastPeriod.date, getTodayISO()) + 1;
   const clampedDay = Math.max(1, Math.min(cycleDay, avgCycleLength));
 
-  // Phase ranges
+  // Biological logic:
+  // Luteal is ~14 days before the next period
+  // Ovulation is the ~4 day window before Luteal
+  // Follicular stretches to fill the gap
+  const lutealLength = 14;
+  const ovulationLength = 4;
+  
+  const lutealStart = Math.max(avgDuration + ovulationLength + 1, avgCycleLength - lutealLength + 1);
+  const ovulationStart = Math.max(avgDuration + 1, lutealStart - ovulationLength);
+
   const phases = [
-    { name: 'Menstrual',   start: 1,                end: avgDuration,       color: '#f43f5e', label: 'Menstrual' },
-    { name: 'Follicular',  start: avgDuration + 1,  end: 12,                color: '#f59e0b', label: 'Follicular' },
-    { name: 'Ovulation',   start: 13,               end: 16,                color: '#14b8a6', label: 'Ovulation' },
-    { name: 'Luteal',      start: 17,               end: avgCycleLength,    color: '#8b5cf6', label: 'Luteal' },
+    { name: 'Menstrual',   start: 1,                end: avgDuration,         color: '#f43f5e', label: 'Menstrual' },
+    { name: 'Follicular',  start: avgDuration + 1,  end: ovulationStart - 1,  color: '#f59e0b', label: 'Follicular' },
+    { name: 'Ovulation',   start: ovulationStart,   end: lutealStart - 1,     color: '#14b8a6', label: 'Ovulation' },
+    { name: 'Luteal',      start: lutealStart,      end: avgCycleLength,      color: '#8b5cf6', label: 'Luteal' },
   ];
 
   let currentPhase = phases[phases.length - 1];

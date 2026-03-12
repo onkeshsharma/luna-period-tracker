@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { getTodayISO, getCalendarDaySets } from '../utils';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-export function CycleCalendar({ cycles }) {
+export function CycleCalendar({ cycles, onDateClick }) {
   const today = getTodayISO();
   const todayY = parseInt(today.slice(0, 4), 10);
   const todayM = parseInt(today.slice(5, 7), 10) - 1;
@@ -32,7 +33,6 @@ export function CycleCalendar({ cycles }) {
   }
 
   const firstDow = new Date(viewYear, viewMonth, 1).getDay();
-  // Adjust so Monday is 0
   const leadingNulls = (firstDow + 6) % 7;
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const cells = [
@@ -44,58 +44,115 @@ export function CycleCalendar({ cycles }) {
     return `${viewYear}-${String(viewMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
   }
 
+  function getCellStyle(day) {
+    if (!day) return {};
+    const iso = isoFor(day);
+    if (periodDays.has(iso)) return null; // handled by className
+    if (predictedDays.has(iso)) return {
+      background: 'var(--luna-glass-bg)',
+      borderColor: 'var(--luna-text-3)',
+      color: 'var(--luna-text-2)',
+    };
+    if (iso === today) return {
+      background: 'var(--luna-accent)',
+      color: '#fff',
+    };
+    return { color: 'var(--luna-text-2)' };
+  }
+
   function cellClasses(day) {
     if (!day) return '';
     const iso = isoFor(day);
-    const base = 'w-8 h-8 flex items-center justify-center text-xs mx-auto';
-    if (periodDays.has(iso))    return base + ' bg-rose-500 text-white rounded-full';
-    if (predictedDays.has(iso)) return base + ' border border-rose-400 text-rose-300 rounded-full';
-    if (iso === today)          return base + ' bg-slate-600 text-white rounded-full anim-pulse-dot';
-    return base + ' text-slate-400';
+    const base = 'w-9 h-9 flex items-center justify-center text-sm font-medium mx-auto transition-transform hover:scale-110 cursor-pointer rounded-full';
+    if (periodDays.has(iso)) return base + ' bg-rose-500 shadow-md shadow-rose-500/30 text-white';
+    if (predictedDays.has(iso)) return base + ' border border-dashed';
+    if (iso === today) return base + ' anim-pulse-dot';
+    return base;
   }
 
   return (
-    <section className="mx-4 mt-4 p-4 glass rounded-xl anim-fade-in-up">
-      <p className="text-xs uppercase tracking-wider text-slate-500 mb-3">Calendar</p>
-      <div className="flex items-center justify-between mb-3">
-        <button
-          onClick={prevMonth}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors"
-          aria-label="Previous month"
+    <section
+      className="mx-4 mt-4 p-5 glass rounded-2xl anim-fade-in-up shadow-lg"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <p
+          className="text-xs uppercase tracking-widest font-semibold"
+          style={{ color: 'var(--luna-text-3)' }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-        <span className="text-sm font-medium text-slate-100">{MONTH_NAMES[viewMonth]} {viewYear}</span>
-        <button
-          onClick={nextMonth}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors"
-          aria-label="Next month"
+          Calendar
+        </p>
+        <div
+          className="flex rounded-lg p-1 border"
+          style={{
+            background: 'var(--luna-glass-bg)',
+            borderColor: 'var(--luna-glass-border)',
+          }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        </button>
+          <button
+            onClick={prevMonth}
+            className="p-1 rounded-md transition-colors hover:opacity-80"
+            style={{ color: 'var(--luna-text-2)' }}
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span
+            className="w-36 text-center text-sm font-semibold"
+            style={{ color: 'var(--luna-text-1)' }}
+          >
+            {MONTH_NAMES[viewMonth]} {viewYear}
+          </span>
+          <button
+            onClick={nextMonth}
+            className="p-1 rounded-md transition-colors hover:opacity-80"
+            style={{ color: 'var(--luna-text-2)' }}
+            aria-label="Next month"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
-      <div className="grid grid-cols-7 gap-y-1 mb-1">
+
+      {/* Day labels */}
+      <div className="grid grid-cols-7 gap-y-2 mb-2">
         {DAY_LABELS.map(d => (
-          <div key={d} className="text-center text-xs text-slate-500 font-medium pb-1">{d}</div>
-        ))}
-        {cells.map((day, i) => (
-          <div key={i} className={cellClasses(day)}>
-            {day || ''}
+          <div
+            key={d}
+            className="text-center text-xs font-medium pb-1 tracking-wide"
+            style={{ color: 'var(--luna-text-3)' }}
+          >
+            {d}
           </div>
         ))}
+        {cells.map((day, i) => (
+          <button
+            key={i}
+            className={cellClasses(day)}
+            style={getCellStyle(day) || undefined}
+            onClick={() => day && onDateClick(isoFor(day))}
+            disabled={!day}
+          >
+            {day || ''}
+          </button>
+        ))}
       </div>
-      <div className="flex gap-4 mt-3 pt-3 border-t border-slate-700">
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
-          <span className="text-xs text-slate-400">Period</span>
+
+      {/* Legend */}
+      <div
+        className="flex gap-5 mt-4 pt-4 justify-center"
+        style={{ borderTop: '1px solid var(--luna-glass-border)' }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50" />
+          <span className="text-xs font-medium tracking-wide" style={{ color: 'var(--luna-text-2)' }}>Period</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full border border-rose-400 inline-block"></span>
-          <span className="text-xs text-slate-400">Predicted</span>
+        <div className="flex items-center gap-2">
+          <span
+            className="w-3 h-3 rounded-full border border-dashed"
+            style={{ borderColor: 'var(--luna-text-3)', background: 'var(--luna-glass-bg)' }}
+          />
+          <span className="text-xs font-medium tracking-wide" style={{ color: 'var(--luna-text-2)' }}>Predicted</span>
         </div>
       </div>
     </section>
