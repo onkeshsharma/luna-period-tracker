@@ -1,69 +1,16 @@
-# Luna — Period Tracking PWA
+# React + Vite
 
-A discreet period tracking app that presents itself as a generic "Luna" app. All data is stored locally in `localStorage` — nothing leaves your device.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## File Structure
+Currently, two official plugins are available:
 
-```
-PeriodTrackingApp/
-├── index.html              # Entry point — loads all dependencies + registers SW
-├── manifest.json           # PWA manifest (name: "Luna")
-├── service-worker.js       # Offline caching (cache-first strategy)
-├── icons/
-│   ├── icon-192.png        # App icon (192×192)
-│   └── icon-512.png        # App icon (512×512)
-```
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## Running Locally
+## React Compiler
 
-You **must** serve the files over HTTP (not `file://`) for the service worker and PWA features to work.
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-**Option 1 — npx serve (recommended):**
-```bash
-npx serve .
-```
-Then open http://localhost:3000
+## Expanding the ESLint configuration
 
-**Option 2 — Python:**
-```bash
-python -m http.server 8080
-```
-Then open http://localhost:8080
-
-**Option 3 — VS Code Live Server** — right-click `index.html` → "Open with Live Server"
-
-## Deploying
-
-Drop the entire folder into any static host:
-
-- **Vercel** — `vercel .` or drag-and-drop at vercel.com
-- **Netlify** — drag-and-drop the folder at app.netlify.com
-- **GitHub Pages** — push to a repo, enable Pages from the root of `main`
-
-No build step required — all dependencies load from CDN.
-
-## Installing as an App
-
-### iOS (Safari)
-1. Open the app URL in Safari
-2. Tap the **Share** button (square with arrow)
-3. Scroll down and tap **Add to Home Screen**
-4. The app will appear as "Luna" on your home screen
-
-### Android (Chrome)
-1. Open the app URL in Chrome
-2. Tap the **three-dot menu** (⋮)
-3. Tap **Install App** or **Add to Home Screen**
-4. The app will appear as "Luna" on your home screen
-
-## Features
-
-- Track cycle start dates
-- Automatically calculates average cycle length from the last 3 cycles
-- Shows next expected date with color-coded status (on-track / late / very late)
-- Cycle stats card: average, shortest, and longest cycle length + average period duration
-- Edit any past entry (date, duration, notes)
-- Two-tap delete confirmation
-- Optional discreet daily reminders with configurable lead time (uses generic messages — no medical terminology)
-- Fully offline after first load
-- All data stays on your device (localStorage only)
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
